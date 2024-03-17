@@ -1,1 +1,150 @@
+# NorthEastSouthWest
 
+import pygame
+import time
+# import math
+from itertools import product
+
+map = [[0,0,0,1,1],[1,1,1,1,1],[1,1,0,0,0],[0,0,0,0,0],[1,1,0,0,0]]
+
+pos1 = [0,0]
+pos2 = [2,3]
+
+
+# collect all potential moves
+moves = [[1,0],[0,1]]
+maxDistance = 0
+moveIndex = 0
+
+for i in range(len(moves)):    
+    distance = abs(pos1[0]-pos2[0]) + abs(pos1[1]-pos2[1])
+    if distance > maxDistance:
+        maxDistance = distance
+        moveIndex = i
+
+corners = [50,150,250,350,450,550,650]
+
+corners5 = list(product(corners[:5],corners[:5]))
+corners7 = list(product(corners,corners))
+
+# print(corners5)
+# print(len(corners5))
+
+for index,item in enumerate(corners5):
+    corners5[index] = [item[1],item[0]]
+
+for index,item in enumerate(corners7):
+    corners7[index] = [item[1],item[0]]
+
+
+f = open("checks.txt", "rt")
+lines = f.read()
+blocks = lines.split(",")
+print(blocks)
+for index,item in enumerate(blocks):
+    blocks[index] = item.strip()
+# print(blocks)
+
+# print(len(blocks))
+
+
+# set window size
+if len(blocks) == 25:
+    width = 650
+    height = 650
+elif len(blocks) == 49:
+    width = 800
+    height = 800
+else:
+    print("ERROR: input files do not match specifications")
+
+# Define colors
+BLACK = (0, 0, 0)
+PINK = (255,0,255)
+WHITE = (255, 255, 255)
+
+# Initialize Pygame
+pygame.init()
+
+# Create the screen
+global screen
+screen = pygame.display.set_mode((650, 650))
+
+# Set caption
+pygame.display.set_caption("Maze map")
+
+def drawRect(x,y,isHorizontal):
+    if isHorizontal:
+        pygame.draw.rect(screen, PINK, (x, y, 110, 10))
+    else:
+        pygame.draw.rect(screen, PINK, (x, y, 10, 110))
+    
+
+
+# Game loop
+running = True
+drawn = False
+while running:
+    # Check for quit event
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Fill the screen with white
+    screen.fill(WHITE)
+
+    # blocks = 1001,1000,1000,1000,1100
+    # corners = (50,50), 50,150s
+    if not drawn:
+        for index,item in enumerate(blocks):
+            print(item)
+            print("end")
+            if item[0] == '1':
+                drawRect(corners5[index][0],corners5[index][1],True)
+                pygame.display.flip()
+                time.sleep(0.01)
+            if item[1] == '1':
+                drawRect(corners5[index][0] + 100,corners5[index][1],False)
+                pygame.display.flip()
+                time.sleep(0.01)
+            if item[2] == '1':
+                drawRect(corners5[index][0],corners5[index][1] + 100,True)
+                pygame.display.flip()
+                time.sleep(0.01)
+            if item[3] == '1':
+                drawRect(corners5[index][0],corners5[index][1],False)
+                pygame.display.flip()
+                time.sleep(0.01)
+        drawn = True
+
+    for index,item in enumerate(blocks):
+            
+            if item[0] == '1':
+                drawRect(corners5[index][0],corners5[index][1],True)
+            if item[1] == '1':
+                drawRect(corners5[index][0] + 100,corners5[index][1],False)
+            if item[2] == '1':
+                drawRect(corners5[index][0],corners5[index][1] + 100,True)
+            if item[3] == '1':
+                drawRect(corners5[index][0],corners5[index][1],False)
+
+    
+
+    # Update the display
+    pygame.display.flip()
+
+    f = open("checks.txt", "rt")
+    lines = f.read()
+    newBlocks = lines.split(",")
+    for index,item in enumerate(newBlocks):
+        newBlocks[index] = item.strip()
+    
+    if newBlocks != blocks and len(newBlocks) > 24:
+        blocks = newBlocks
+        drawn = False
+        screen.fill(WHITE)
+        pygame.display.flip()
+
+
+# Quit Pygame
+pygame.quit()
