@@ -1,1 +1,172 @@
+#include <SPI.h>
+#include <RF24.h>
+
+#define CE_PIN   7
+#define CSN_PIN 8
+
+RF24 radio(CE_PIN, CSN_PIN);
+
+// pin config for basic platform test
+// Motors
+int Motor_right_PWM = 10;  //   0 (min speed) - 255 (max speed) 
+int Motor_right_direction = 5;  //   0 Forward - 1 Reverse
+int Motor_left_PWM = 9;    //   0 (min speed) - 255 (max speed)  
+int Motor_left_direction = 6;   //   0 Forward - 1 Reverse
+#define Forward 0
+#define Reverse 1
+// LED
+int LED1 = 13;
+int LED2 = 12;
+int IR_enable=4;
+int IR_threshold= 900; // 0 white close obstacle -- 1023 no obstacle
+
+// Let these addresses be used for the pair
+uint8_t address[][6] = { "1Node", "2Node" };
+// It is very helpful to think of an address as a path instead of as
+// an identifying device destination
+
+// to use different addresses on a pair of radios, we need a variable to
+// uniquely identify which address this radio will use to transmit
+bool radioNumber = 0;  // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+
+// State variable for receiver
+enum ReceiverState {
+  IDLE,
+  SENDING,
+  ON_CALL
+};
+
+ReceiverState state = IDLE;
+
+void setup() {
+  Serial.begin(9600);
+
+// initialize Ports
+  pinMode(Motor_left_PWM, OUTPUT);
+  pinMode(Motor_right_PWM, OUTPUT);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(IR_enable, OUTPUT);
+
+  radio.begin();
+  // set the TX address of the RX node into the TX pipe
+  radio.openWritingPipe(address[1]); 
+
+  // set the RX address of the TX node into a RX pipe
+  radio.openReadingPipe(1, address[0]); 
+  radio.setPALevel(RF24_PA_LOW);   // Set power level to low
+  radio.startListening();
+}
+
+// Variables for 5 IR proximity sensors 
+int IR_right,IR_right_front,IR_front,IR_left_front,IR_left;
+
+void IR_proximity_read(){    // read IR sensors 
+  int n=5;  // average parameter
+  digitalWrite(IR_enable, HIGH);  //IR Enable
+  IR_right=0;
+  IR_right_front=0;
+  IR_front=0;
+  IR_left_front=0;
+  IR_left=0;
+  for (int i=0;i<n;i++){
+    IR_right+=analogRead(A3);
+    IR_right_front+=analogRead(A2);
+    IR_front+=analogRead(A1);
+    IR_left_front+=analogRead(A0);
+    IR_left+=analogRead(A7);
+    delay(5);
+  }
+  IR_right/=n;
+  IR_right_front/=n;
+  IR_front/=n;
+  IR_left_front/=n;
+  IR_left/=n; 
+}
+
+String GetSensorReadingsAsString() {
+  String sensorData = String(IR_right) + "," + String(IR_right_front) + "," +
+                      String(IR_front) + "," + String(IR_left_front) + "," +
+                      String(IR_left);
+  return sensorData;
+}
+
+void forward(){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+}
+
+void forward(int delay_time){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+  delay(delay_time);
+}
+
+void reverse(int delay_time){
+  analogWrite(Motor_right_PWM,25 ); // right motor
+  digitalWrite(Motor_right_direction,Reverse); //right
+  analogWrite(Motor_left_PWM, 30); // left 
+  digitalWrite(Motor_left_direction,Reverse); //left
+  delay(delay_time);
+}
+
+void right(int delay_time){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 10); // left 
+  digitalWrite(Motor_left_direction,Reverse); //left
+  delay(delay_time);
+}
+
+void left(int delay_time){
+  analogWrite(Motor_right_PWM,10); // right motor
+  digitalWrite(Motor_right_direction,Reverse); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+  delay(delay_time);
+}
+
+
+void loop() {
+  if (state == 0) {
+      // Wait for a request from the transmitter
+      if (radio.available()) {
+        char request[32]; // Buffer to hold received request
+        radio.read(&request, sizeof(request));
+        if (strcmp(request, "get") == 0) {
+          state = SENDING;
+          radio.stopListening();
+        }
+      }
+  }
+  if (state == 1) {
+      // Send sensor readings to the transmitter
+      Serial.print("Sending sensor readings: ");
+      IR_proximity_read();
+      String sensorReadings = GetSensorReadingsAsString();
+      Serial.println(sensorReadings);
+      radio.write(sensorReadings.c_str(), sensorReadings.length() + 1);
+      state = ON_CALL;
+      radio.startListening();
+  }
+  if (state == 2) {
+      // Wait for a request from the transmitter
+      if (radio.available()) {
+        char request[32]; // Buffer to hold received request
+        radio.read(&request, sizeof(request));
+        if (strcmp(request, "forward") == 0) {
+          Serial.println("Forward");
+          // reverse(10);
+          // left(10);
+          state = IDLE;
+          radio.stopListening();
+        }
+      }
+  }
+  delay(1000);  // Delay before checking for next request
+}
 
