@@ -1,1 +1,265 @@
 
+
+// Basic test of Mona robot including proximity sensors and open-loop motion control
+
+// pin config for basic platform test
+// Motors
+int Motor_right_PWM = 10;  //   0 (min speed) - 255 (max speed) 
+int Motor_right_direction = 5;  //   0 Forward - 1 Reverse
+int Motor_left_PWM = 9;    //   0 (min speed) - 255 (max speed)  
+int Motor_left_direction = 6;   //   0 Forward - 1 Reverse
+int Motor_left_enc = 2;
+int Motor_right_enc = 3;
+
+int prevEncoderStateA;
+int prevEncoderStateB;
+
+#define Forward 0
+#define Reverse 1
+// LED
+int LED1 = 13;
+int LED2 = 12;
+int IR_enable=4;
+int IR_threshold= 988; // 0 white close obstacle -- 1023 no obstacle
+
+int G_fwd_r = 25;//20
+int G_fwd_l = 30;//23
+
+float r = 0;
+float l = 0;
+void incrementL(){
+  l = l + 0.004;
+}
+void incrementR(){
+  r = r + 0.004;
+}
+
+void setup() {
+// initialize serial communication at 9600 bits per second:
+ Serial.begin(115200);
+// initialize Ports
+  pinMode(Motor_left_PWM, OUTPUT);
+  pinMode(Motor_right_PWM, OUTPUT);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(IR_enable, OUTPUT);
+  pinMode(Motor_right_enc, INPUT);
+  pinMode(Motor_left_enc, INPUT);
+
+  prevEncoderStateA = 0;
+  prevEncoderStateB = 0;
+  attachInterrupt(digitalPinToInterrupt(2), incrementL, RISING);
+  attachInterrupt(digitalPinToInterrupt(3), incrementR, RISING);
+  
+}
+
+void rightSet(float target){
+  do {
+    right(1);
+
+  }
+  while (( (r+l)/2) <= target);
+  
+  r = 0;
+  l = 0;
+}
+
+void leftSet(float target){
+  do {
+    left(1);
+
+  }
+  while (( (r+l)/2) <= target);
+  
+  r = 0;
+  l = 0;
+}
+
+void forwardSet(float target){
+
+  do {
+    forward(1);
+
+  }
+  while (( (r+l)/2) <= target);
+  
+  r = 0;
+  l = 0;
+
+}
+
+void reverse(){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+}
+
+void reverse(int delay_time){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+  delay(delay_time);
+}
+
+void forward(int delay_time){
+  analogWrite(Motor_right_PWM,G_fwd_r ); // right motor
+  digitalWrite(Motor_right_direction,Reverse); //right
+  analogWrite(Motor_left_PWM, G_fwd_l); // left 
+  digitalWrite(Motor_left_direction,Reverse); //left
+  delay(delay_time);
+}
+
+void right(int delay_time){
+  analogWrite(Motor_right_PWM,240); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 10); // left 
+  digitalWrite(Motor_left_direction,Reverse); //left
+  delay(delay_time);
+}
+
+void stop(int delay_time){
+  analogWrite(Motor_right_PWM,0); // right motor
+  digitalWrite(Motor_right_direction,Forward); //right
+  analogWrite(Motor_left_PWM, 0); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+  delay(delay_time);
+}
+
+void left(int delay_time){
+  analogWrite(Motor_right_PWM,10); // right motor
+  digitalWrite(Motor_right_direction,Reverse); //right
+  analogWrite(Motor_left_PWM, 240); // left 
+  digitalWrite(Motor_left_direction,Forward); //left
+  delay(delay_time);
+}
+
+// Variables for 5 IR proximity sensors 
+int IR_right,IR_right_front,IR_front,IR_left_front,IR_left;
+
+void IR_proximity_read(){    // read IR sensors 
+  int n=10;  // average parameter
+  digitalWrite(IR_enable, HIGH);  //IR Enable
+  IR_right=0;
+  IR_right_front=0;
+  IR_front=0;
+  IR_left_front=0;
+  IR_left=0;
+  for (int i=0;i<n;i++){
+    IR_right+=analogRead(A3);
+    IR_right_front+=analogRead(A2);
+    IR_front+=analogRead(A1);
+    IR_left_front+=analogRead(A0);
+    IR_left+=analogRead(A7);
+    delay(5);
+  }
+  IR_right/=n;
+  IR_right_front/=n;
+  IR_front/=n;
+  IR_left_front/=n;
+  IR_left/=n; 
+}
+
+// obstacle avoidance
+void Obstacle_avoidance(){
+  if (IR_front<IR_threshold){
+      digitalWrite(LED2,HIGH);
+      forward(300);
+      right(500);
+      digitalWrite(LED2,LOW);
+  }
+  if (IR_right<IR_threshold || IR_right_front<IR_threshold ){
+      digitalWrite(LED2,HIGH);
+      right(500);
+      digitalWrite(LED2,LOW);
+  } else {
+      if (IR_left<IR_threshold || IR_left_front<IR_threshold ){
+          digitalWrite(LED2,HIGH);
+          left(500);
+          digitalWrite(LED2,LOW);
+      } else reverse();
+  }  
+}
+
+// send IR readings to Serial Monitor
+void Send_sensor_readings(){
+ Serial.print(IR_left);  
+ Serial.print(',');
+ Serial.print(IR_left_front);
+ Serial.print(',');
+ Serial.print(IR_front);
+ Serial.print(',');
+ Serial.print(IR_right_front);
+ Serial.print(',');
+ Serial.println(IR_right);
+}
+
+void forwardCustom(int power_left, int power_right, int delay_time){
+  analogWrite(Motor_right_PWM,power_right ); // right motor
+  digitalWrite(Motor_right_direction,Reverse); //right
+  analogWrite(Motor_left_PWM, power_left); // left 
+  digitalWrite(Motor_left_direction,Reverse); //left
+  delay(delay_time);
+}
+
+
+
+// the loop routine runs over and over again forever:
+void loop() {
+
+
+
+// forwardSet(1.27*7); //12cm is 12.7*7
+
+IR_proximity_read();
+Send_sensor_readings();
+// if(IR_right < IR_threshold && IR_left < IR_threshold){
+//   // if(IR_right > IR_left){
+//   //   forwardCustom(G_fwd_l-8,255,10);//normal is 23,20
+//   //   forward(350);
+//   //   forwardCustom(255,G_fwd_r-8,10);
+//   // }
+//   // else{
+//   //   forwardCustom(255,G_fwd_r-8,10);//normal is 23,20
+//   //   forward(350);
+//   //   forwardCustom(G_fwd_l-8,255,10);
+//   // }
+//   forward(1);
+  
+  
+// }
+// if (IR_front>IR_threshold){
+      
+//   forwardSet(1.27*3.5);
+// }
+// if (IR_front<IR_threshold && IR_left<IR_threshold){
+      
+//   left(280);
+//   forwardSet(1.27*3.5);
+// }
+// if (IR_front<IR_threshold && IR_right<IR_threshold){
+      
+//   right(280);
+//   forwardSet(1.27*3.5);
+// }
+// if (IR_front<IR_threshold && IR_right<IR_threshold && IR_left<IR_threshold){
+      
+//   right(280);
+//   right(280);
+//   forwardSet(1.27*3.5);
+// }
+leftSet(3.8);
+stop(1500);
+
+// forward(100);
+// stop(500);
+
+
+ 
+
+
+//  digitalWrite(LED1,LOW); //Top LED
+
+       // delay in between reads for stability
+}
