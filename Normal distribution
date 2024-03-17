@@ -1,0 +1,42 @@
+#Libraries
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+            
+import statistics
+
+
+def is_float(number):
+    try:
+        float(number)
+        return True
+    
+    except ValueError:
+        print("Not a number")
+        return False
+
+input_file = open("LC.csv", "r")
+data = np.zeros((0, 5))
+for line in input_file:
+
+        split_up = line.split(',')
+        if is_float(split_up[0]) and is_float(split_up[1]) and is_float(split_up[2]) and is_float(split_up[3]) and is_float(split_up[4]):
+            temp = np.array([float(split_up[0]), float(split_up[1]),float(split_up[2]), float(split_up[3]),float(split_up[4])])
+            data = np.vstack((data,temp))
+
+
+sensors = np.array(["R","RC","C","LC","L"])
+n=0
+#while n <5:
+mean_value = statistics.mean(data[:,n])
+std_deviation = statistics.stdev(data[:,n])
+print("stats",sensors[n])
+print(mean_value)
+print(std_deviation)
+#print("Mean of of", sensors[n], mean_value)
+
+#Calculate the standard deviation
+#std_deviation = statistics.stdev(data[:,n])
+#print("Standard Deviation of ",sensors[n], std_deviation)
+    #'n+=1
+
