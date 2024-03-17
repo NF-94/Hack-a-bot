@@ -1,1 +1,97 @@
+#include <SPI.h>
+#include <RF24.h>
+
+#define CE_PIN   7
+#define CSN_PIN 8
+
+RF24 radio(CE_PIN, CSN_PIN);
+RF24 radio_gary(CE_PIN, CSN_PIN);
+RF24 radio_neil(CE_PIN, CSN_PIN);
+
+// Let these addresses be used for the pair
+uint8_t address[][6] = { "1Node", "2Node" };
+// It is very helpful to think of an address as a path instead of as
+// an identifying device destination
+
+// to use different addresses on a pair of radios, we need a variable to
+// uniquely identify which address this radio will use to transmit
+bool radioNumber = 1;  // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+bool gary = false;
+// State variable for transmitter
+enum TransmitterState {
+  IDLE,
+  RECEIVING,
+  PROCESSING
+};
+
+TransmitterState state = IDLE;
+
+void setup() {
+  Serial.begin(9600);
+
+  radio_neil.begin();
+  radio_gary.begin();
+
+  radio_neil.openWritingPipe(address[0]); 
+  radio_gary.openWritingPipe(address[1]);
+
+  radio_neil.openReadingPipe(1, address[1]);
+  radio_gary.openReadingPipe(1, address[0]);
+  
+  radio_neil.setPALevel(RF24_PA_LOW);
+  radio_gary.setPALevel(RF24_PA_LOW);
+  
+  radio_neil.stopListening();
+  radio_gary.stopListening();
+}
+
+String robot;
+
+void loop() {
+  RF24* activeRadio;
+
+  if (gary) {
+    activeRadio = &radio_gary;
+    robot = "Gary";
+  } else {
+    activeRadio = &radio_neil;
+    robot = "Neil";
+  }
+
+  if (state == IDLE) {
+    // Wait for a request from the receiver
+    Serial.print("Requesting ");
+    Serial.print(robot);
+    Serial.println("s sensor readings...");
+    String request = "get";
+    activeRadio->write(request.c_str(), request.length() + 1);
+    activeRadio->startListening();
+    state = RECEIVING;
+  }
+  // Receiving
+  if (state == RECEIVING) {
+    // Do nothing, wait for next cycle
+    if (activeRadio->available()) {
+      char receive[32]; // Buffer to hold received request
+      activeRadio->read(&receive, sizeof(receive));
+      Serial.print(robot);
+      Serial.print(" sensor readings received: ");
+      Serial.println(receive);
+      state = PROCESSING;
+      activeRadio->stopListening();
+      gary = !gary;
+    }
+  }
+  if (state == PROCESSING) {
+    Serial.println("Processing sensor readings...");
+    // Action = processing(receive);
+    String action = "forward";
+    activeRadio->write(action.c_str(), action.length() + 1);
+    state = IDLE;
+  }
+
+  delay(1000);  // Delay before checking for next request
+}
+
+
 
